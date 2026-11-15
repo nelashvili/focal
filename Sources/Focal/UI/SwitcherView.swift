@@ -4,21 +4,27 @@ struct SwitcherView: View {
     @ObservedObject var model: SwitcherModel
     var onPick: (Int) -> Void
 
+    private var selectedID: CGWindowID? {
+        model.windows.indices.contains(model.selected) ? model.windows[model.selected].id : nil
+    }
+
     var body: some View {
         let cols = Array(repeating: GridItem(.fixed(model.cardWidth), spacing: 12), count: model.columns)
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
                 LazyVGrid(columns: cols, spacing: 12) {
+                    // Identity is the window ID only. (A second `.id(i)` used to override it, so after a
+                    // reorder SwiftUI matched cards to stale views and left the old selection ring lit.)
                     ForEach(Array(model.windows.enumerated()), id: \.element.id) { i, w in
                         WindowCard(window: w, thumb: model.thumbs[w.id], showThumbnail: model.showThumbnails,
                                    width: model.cardWidth, selected: i == model.selected)
-                            .id(i)
                             .onTapGesture { onPick(i) }
                     }
                 }
                 .padding(16)
             }
-            .onChange(of: model.selected) { _, new in proxy.scrollTo(new) }
+            .onChange(of: selectedID) { _, id in if let id { proxy.scrollTo(id) } }
+            .onAppear { if let id = selectedID { proxy.scrollTo(id) } }
         }
     }
 }

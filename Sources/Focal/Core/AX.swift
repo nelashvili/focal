@@ -5,12 +5,36 @@ import CoreGraphics
 @_silgen_name("_AXUIElementGetWindow")
 private func _AXUIElementGetWindow(_ element: AXUIElement, _ id: UnsafeMutablePointer<CGWindowID>) -> AXError
 
+/// Private: builds an AXUIElement from a remote token. Used to reach windows on other Spaces,
+/// which kAXWindowsAttribute does not return.
+@_silgen_name("_AXUIElementCreateWithRemoteToken")
+private func _AXUIElementCreateWithRemoteToken(_ token: CFData) -> Unmanaged<AXUIElement>?
+
 /// Thin helpers over the verbose C Accessibility API.
 enum AX {
     static func value<T>(_ el: AXUIElement, _ attr: String) -> T? {
         var v: CFTypeRef?
         guard AXUIElementCopyAttributeValue(el, attr as CFString, &v) == .success else { return nil }
         return v as? T
+    }
+
+    /// Like `value`, but also reports the error so callers can tell "absent" from "timed out".
+    static func read<T>(_ el: AXUIElement, _ attr: String) -> (T?, AXError) {
+        var v: CFTypeRef?
+        let err = AXUIElementCopyAttributeValue(el, attr as CFString, &v)
+        return (err == .success ? v as? T : nil, err)
+    }
+
+    /// Element `elementID` of app `pid`, addressed directly (token layout: pid, 0, 'coco', id).
+    static func element(pid: pid_t, elementID: UInt64) -> AXUIElement? {
+        var token = Data(count: 20)
+        token.withUnsafeMutableBytes { b in
+            b.storeBytes(of: pid, toByteOffset: 0, as: pid_t.self)
+            b.storeBytes(of: Int32(0), toByteOffset: 4, as: Int32.self)
+            b.storeBytes(of: Int32(0x636f636f), toByteOffset: 8, as: Int32.self)
+            b.storeBytes(of: elementID, toByteOffset: 12, as: UInt64.self)
+        }
+        return _AXUIElementCreateWithRemoteToken(token as CFData)?.takeRetainedValue()
     }
 
     static func bool(_ el: AXUIElement, _ attr: String) -> Bool {
