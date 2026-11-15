@@ -52,3 +52,7 @@ Sources/Focal/
   Windows/  Window discovery, MRU tracking, thumbnails, snapping
 Scripts/bundle.sh   Builds and signs Focal.app
 ```
+
+## License
+
+[MIT](LICENSE)
